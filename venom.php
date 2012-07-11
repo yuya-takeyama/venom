@@ -160,4 +160,9 @@ class Venom_Repository_Github implements Venom_RepositoryInterface
     }
 }
 
+function github($url, $options = array()) {
+    global $venom;
+    $venom->github($url, $options);
+}
+
 Venom_Application::run();
