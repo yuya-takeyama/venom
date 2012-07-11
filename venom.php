@@ -7,6 +7,8 @@ class Venom_Application
 
     private $repos = array();
 
+    private $autoload = array();
+
     private $vendor = './vendor';
 
     public static function run()
@@ -16,6 +18,7 @@ class Venom_Application
             $app->initialize();
             $app->loadVenomfile();
             $app->download();
+            $app->generateAutoloader();
         } catch (Exception $e) {
             echo get_class($e) . ": {$e->getMessage()}", PHP_EOL;
         }
@@ -32,6 +35,12 @@ class Venom_Application
         mkdir(self::TMP_DIR);
         if (!file_exists($this->vendor)) {
             mkdir($this->vendor);
+        }
+        if (!file_exists($this->vendor('SplClassLoader'))) {
+            mkdir($this->vendor('SplClassLoader'));
+        }
+        if (!file_exists($this->vendor('SplClassLoader/SplClassLoader.php'))) {
+            $this->cmd('wget', '--quiet', '-O', $this->vendor('SplClassLoader/SplClassLoader.php'), 'https://raw.github.com/gist/221634/SplClassLoader.php');
         }
     }
 
@@ -58,6 +67,12 @@ class Venom_Application
             $this->cmd('tar', 'xzf', $this->tmp($repo->getTarGzFilename()), '--strip-components', '1', '-C', $this->tmp($repo->getHash()));
             $this->cmd('rm', '-rf', $this->getTargetDir($repo));
             $this->cmd('cp', '-pr', $this->getTmpDir($repo), $this->getTargetDir($repo));
+            $config = $this->getAutoloadConfig($repo);
+            if ($config && is_array($config)) {
+                foreach ($config as $key => $value) {
+                    $this->autoload[$key] = $this->getTargetDir($repo) . DIRECTORY_SEPARATOR . $value;
+                }
+            }
         }
     }
 
@@ -78,6 +93,27 @@ class Venom_Application
         return $this->vendor("{$repo->getUser()}-{$repo->getProject()}");
     }
 
+    private function getComposerJson(Venom_RepositoryInterface $repo)
+    {
+        return $this->getTargetDir($repo) . DIRECTORY_SEPARATOR . 'composer.json';
+    }
+
+    private function hasComposerJson(Venom_RepositoryInterface $repo)
+    {
+        return file_exists($this->getComposerJson($repo));
+    }
+
+    public function getAutoloadConfig(Venom_RepositoryInterface $repo)
+    {
+        if ($this->hasComposerJson($repo)) {
+            $json = json_decode(file_get_contents($this->getComposerJson($repo)), true);
+            if (isset($json['autoload']) && isset($json['autoload']['psr-0'])) {
+                $config = $json['autoload']['psr-0'];
+                return $config;
+            }
+        }
+    }
+
     private function tmp($file)
     {
         return self::TMP_DIR . DIRECTORY_SEPARATOR . $file;
@@ -86,6 +122,18 @@ class Venom_Application
     private function vendor($file)
     {
         return $this->vendor . DIRECTORY_SEPARATOR . $file;
+    }
+
+    private function generateAutoloader()
+    {
+        $fp = fopen($this->vendor('autoload.php'), 'w');
+        fputs($fp, '<?php' . PHP_EOL);
+        fputs($fp, 'require_once \'./vendor/SplClassLoader/SplClassLoader.php\';' . PHP_EOL);
+        foreach ($this->autoload as $namespace => $dir) {
+            fputs($fp, '$loader = new SplClassLoader(' . var_export($namespace, true) . ', ' . var_export($dir, true) . ');' . PHP_EOL);
+            fputs($fp, '$loader->register();' . PHP_EOL);
+        }
+        fclose($fp);
     }
 }
 
