@@ -79,7 +79,8 @@ class Venom_Application
 
     private function cmd()
     {
-        $cmd = join(' ', array_map('escapeshellarg', func_get_args()));
+        $args = func_get_args();
+        $cmd = join(' ', array_map('escapeshellarg', $args));
         echo $cmd, PHP_EOL;
         echo `$cmd`;
     }
