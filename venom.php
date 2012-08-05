@@ -66,6 +66,7 @@ class Venom_Application
             mkdir($this->getTmpDir($repo));
             $this->cmd('tar', 'xzf', $this->tmp($repo->getTarGzFilename()), '--strip-components', '1', '-C', $this->tmp($repo->getHash()));
             $this->cmd('rm', '-rf', $this->getTargetDir($repo));
+            $this->cmd('mkdir', '-p', dirname($this->getTargetDir($repo)));
             $this->cmd('cp', '-pr', $this->getTmpDir($repo), $this->getTargetDir($repo));
             $config = $this->getAutoloadConfig($repo);
             if ($config && is_array($config)) {
@@ -90,7 +91,7 @@ class Venom_Application
 
     private function getTargetDir(Venom_RepositoryInterface $repo)
     {
-        return $this->vendor("{$repo->getUser()}-{$repo->getProject()}");
+        return $this->vendor($repo->getUser() . DIRECTORY_SEPARATOR . $repo->getProject());
     }
 
     private function getComposerJson(Venom_RepositoryInterface $repo)
